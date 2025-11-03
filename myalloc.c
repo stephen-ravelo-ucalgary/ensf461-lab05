@@ -123,105 +123,31 @@ void myfree(void *ptr)
     }
     else if (chunkHeader->is_free == 0) {
         chunkHeader->is_free = 1;
+
+        node_t *fwdFreeChunk = chunkHeader->fwd;
+        if (fwdFreeChunk) {
+            if (fwdFreeChunk->is_free) {
+                chunkHeader->size += fwdFreeChunk->size + sizeof(node_t);
+                if (fwdFreeChunk->fwd) {
+                    fwdFreeChunk->fwd->bwd = chunkHeader;
+                }
+                chunkHeader->fwd = fwdFreeChunk->fwd;
+            }
+        }
+
+        node_t *bwdFreeChunk = chunkHeader->bwd;
+        if (bwdFreeChunk) {
+            if (bwdFreeChunk->is_free) {
+                bwdFreeChunk->size += chunkHeader->size + sizeof(node_t);
+                if (chunkHeader->fwd) {
+                    chunkHeader->fwd->bwd = bwdFreeChunk;
+                }
+                bwdFreeChunk->fwd = chunkHeader->fwd;
+            }
+        }
+        
         statusno = 0;
     } else {
         statusno = ERR_CALL_FAILED;
     }
 }
-
-#if 0
-#define PRINTF_GREEN(...) fprintf(stderr, "\033[32m"); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\033[0m");
-
-void print_header(node_t *header){
-  //Note: These printf statements may produce a segmentation fault if the buff
-  //pointer is incorrect, e.g., if buff points to the start of the arena.
-  printf("Header->size: %lu\n", header->size);
-  printf("Header->fwd: %p\n", header->fwd);
-  printf("Header->bwd: %p\n", header->bwd);
-  printf("Header->is_free: %d\n", header->is_free);
-}
-
-// PRINTF_GREEN("Assert %d passed!\n", test++);
-
-void test1() {
-  int size = 0, test = 1;
-  int page_size = getpagesize();
-  void *buff, *buff2 = NULL;
- 
-  PRINTF_GREEN(">> Testing allocations without the possibility to split. No Frees. (test_allocation_basic)\n");
-
-  buff = myalloc(page_size);
-  assert(statusno == ERR_UNINITIALIZED);
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-  assert(buff == NULL);
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-
-  // Allocation not possible because we didn't account for the header which is
-  // also placed in the arena and takes of sizeof(node_t) bytes. 
-  myinit(page_size);
-  buff = myalloc(page_size); 
-  assert(statusno == ERR_OUT_OF_MEMORY);
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-  assert(buff == NULL);
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-
-  size = page_size-sizeof(node_t);
-  buff = myalloc(size); 
-  assert(buff != NULL);
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-
-  // Check that we can write to the allocated memory  
-  memset(buff, 'a', size);
-  assert(((char *)buff)[0] == 'a' && ((char *)buff)[size-1] == 'a');
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-
-  //This allocation should fail because the previous allocation used all of
-  //the remaining space. 
-  buff2 = myalloc(1); 
-  assert(buff2 == NULL);  
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-  assert(statusno == ERR_OUT_OF_MEMORY);
-  PRINTF_GREEN("Assert %d passed!\n", test++);
-  
-  mydestroy();
-}
-
-void test2() {
-    myinit(getpagesize());
-    void *buff1 = myalloc(1);
-    myfree(buff1);
-    void *buff2 = myalloc(1);
-    mydestroy();
-}
-
-
-void test3() {
-    int test=1;
-    int size =0;
-    int page_size = getpagesize();
-    void *buff = NULL, *buff2 = NULL;
-    node_t *header = NULL, *header2 = NULL; 
-
-    myinit(page_size);
-    buff = myalloc(64);
-    //This should leave 10 bytes remaining in the arena
-    size = page_size - 64 - (sizeof(node_t) * 2) - 10;
-    buff2 = myalloc(size);
-
-    header2 = (node_t *)(buff2 - sizeof(node_t));
-    print_header(header2);
-
-    printf("DEBUG: header size = %ld\n", header2->size);
-
-    assert(header2->size == size + 10);
-    PRINTF_GREEN("Assert %d passed!\n", test++);
-    assert(header2->fwd == NULL);
-    PRINTF_GREEN("Assert %d passed!\n", test++);
-
-    mydestroy();
-}
-
-int main() {
-    test();
-}
-#endif
