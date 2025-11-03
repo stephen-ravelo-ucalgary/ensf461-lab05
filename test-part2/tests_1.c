@@ -59,7 +59,7 @@ void test_allocation_basic(){
   PRINTF_GREEN("Assert %d passed!\n", test++);
   assert(statusno == ERR_OUT_OF_MEMORY);
   PRINTF_GREEN("Assert %d passed!\n", test++);
-
+  
   mydestroy();
 }
 
